@@ -56,6 +56,10 @@ sub select_track {
 }
 
 my $notify = 0;
+my $upped = 0;
+my $downed = 0;
+my $all = 0;
+my $shuffle = 0;
 my $done_options = 0;
 @ARGV = grep {
     if ($done_options) {
@@ -63,6 +67,22 @@ my $done_options = 0;
     }
     elsif (/^--?notify$/) {
         $notify = 1;
+        ();
+    }
+    elsif (/^--?upped$/) {
+        $upped = 1;
+        ();
+    }
+    elsif (/^--?downed$/) {
+        $downed = 1;
+        ();
+    }
+    elsif (/^--?all$/) {
+        $all = 1;
+        ();
+    }
+    elsif (/^--?shuffle$/) {
+        $all = 1;
         ();
     }
     elsif (/^--$/) {
@@ -107,14 +127,31 @@ else {
 
 given ($command) {
     when ('play') {
-        -e 'control-pipe' or system qw(mkfifo control-pipe);
-        -d 'pl' or mkdir 'pl';
-        -s 'pl/select' or die failure "There are no filenames in pl/select.";
-        if (slurp('current') ne "\n") {
+        if (-s 'current') {
              die failure "There is already a mym running.\n";
         }
-        splat 'pl/queue', shuffle lines 'pl/select';
-         # Did not find a better way to do this.
+        -e 'control-pipe' or system qw(mkfifo control-pipe);
+        -d 'pl' or mkdir 'pl';
+        my @queue = @ARGV;
+        if (!@queue) {
+            -s 'pl/default' or die failure "No arguments given and there are no filenames in pl/default.";
+            @queue = lines 'pl/default';
+        }
+        if ($downed) {
+            my %down = map $_ => 1, lines 'pl/down';
+            @queue = grep $down{$_}, @queue;
+        }
+        if ($upped) {
+            my %up = map $_ => 1, lines 'pl/up';
+            @queue = grep $up{$_}, @queue;
+        }
+        if (!$all && !$downed && !$upped) {
+            my %down = map $_ => 1, lines 'pl/down';
+            @queue = grep !$down{$_}, @queue;
+        }
+        $shuffle and @queue = shuffle @queue;
+        splat 'pl/queue', @queue;
+         # This method allows user input on the terminal.
         system('mplayer -input file=control-pipe -playlist pl/queue | ./mym parse');
         splat 'current', '';
     }
@@ -141,14 +178,6 @@ given ($command) {
         else {
             append 'pl/down', "$track\n";
         }
-         # Remove from pl/select
-        my $select = slurp 'pl/select';
-        if ($select =~ s/^\Q$track\E\n//m) {
-            splat 'pl/select', $select;
-        }
-        else {
-            warn warning "not in pl/select: $track\n";
-        }
         warn success "down: $track\n";
          # And stop playing the track too
         if ($selected_current) {
@@ -162,12 +191,24 @@ given ($command) {
     when ('info') {
         my $track = select_track;
         $track =~ s/'/'\\''/g;
-        my $info = `id3v2 -l '$track'`;
-        if ($notify) {
-            system 'notify-send', 'mym info', $info;
+        my $info = `id3v2 -R '$track'`;
+        my $title = $info =~ /^TIT2: (.*)$/m
+            ? $1 : '<unknown title>';
+        my $artist = $info =~ /^TPE1: (.*)$/m
+            ? $1 : '<unknown artist>';
+        my $album = $info =~ /^TALB: (.*)$/m
+            ? $1 : '<unknown album>';
+        my $comment = $info =~ /^COMM: (?:\(\)\[[^\]]+\]: )?(.*?)^[A-Z0-9]{4}:/ms
+            ? $1 : undef;
+        my $display = join "\n", $title, $artist, $album;
+        if (defined $comment) {
+            $display .= "\n\n$comment";
         }
-        $info =~ s/(: .*)$/\e[1m$1\e[0m/mg;
-        print $info;
+        $display .= "\n" unless $display =~ /\n$/;
+        if ($notify) {
+            system 'notify-send', 'mym info', $display;
+        }
+        print $display;
     }
     when ('control') {
         -e 'control-pipe' or die failure "control-pipe doesn't exist.\n";
