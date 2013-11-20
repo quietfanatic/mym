@@ -78,7 +78,7 @@ given ($command) {
         -s 'pl-select' or die failure "There are no filenames in pl-select.";
         splat 'pl-queue', shuffle lines 'pl-select';
          # Did not find a better way to do this.
-        system('mplayer -input file=control-pipe -playlist pl-queue | ./set-current');
+        system('mplayer -input file=control-pipe -playlist pl-queue | ./mym parse');
         splat 'current', '';
     }
     when ('up') {
@@ -125,7 +125,21 @@ given ($command) {
     when ('control') {
         splat 'control-pipe', (join ' ', @ARGV) . "\n";
     }
+    when ('parse') {
+        local $| = 1;
+        my $in = '';
+        my $chunk = '';
+        while (sysread STDIN, my $chunk, 1000) {
+            print $chunk;
+            $in .= $chunk;
+            while ($in =~ s/^((?:Playing (.*)\.|.*)[\n\r])//) {
+                if (defined $2) {
+                    splat 'current', "$2\n";
+                }
+            }
+        }
+    }
     default {
-        die failure "No command $command.  Accepted are: up down info control";
+        die failure "No command $command.  Accepted are: play up down info control parse";
     }
 }
