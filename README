@@ -7,6 +7,6 @@ without having to deal with the cloud and the browser.
 
 type ./mym -help for usage info.
 
-Since every operation of this music manager can be done with a shell command,
+Since every operation of this music manager is done with a shell command,
 it's very amenable to being controlled with global keyboard shortcuts.  I
 recommend having some shortcuts that mirror mplayer's keyboard interface.
