@@ -3,7 +3,41 @@ use FindBin;
 use autodie;
 use List::Util 'shuffle';
 use v5.14;
+my $old_cwd = $ENV{PWD} // die "\$ENV{PWD} was undefined\n";
 chdir $FindBin::Bin;
+
+sub USAGE {
+    print <<"END";
+USAGE: $0 <options>? <command>
+Available commands are:
+    play <options>? <files>?
+        Starts an mplayer instance.  If no <files> are given, reads filenames
+         from pl/default.  After filtering and shuffling, the queued tracks
+         will be written to pl/queue.  The curretly-playing track is visible
+         in ./current.  Available options are:
+            -all : don't ignore tracks that have been rated down
+            -upped : play only tracks that have been rated up
+            -downed : play onlt tracks that have been rated down
+            -shuffle : play in random order
+    up <file>?
+        Rate up a file, defaulting to current track.
+    down <file>?
+        Rate down a file, defaulting to current track, and causing the
+         currently playing player to step forward if so.
+    info <file>?
+        Print id3v2 tags for the file, defaulting to current track.
+    control <command>
+        Send a command to mplayer through a fifo.  See mplayer's documentation.
+    parse
+        Just interpret mplayer's output and write to ./current.  This is used
+         internally by play.
+Universal options are:
+    -notify : Any relevant information and error messages are sent to
+               notify-send as well as being printed.  Does not notify
+               when the current track has changed.
+
+END
+}
 
 sub slurp {
     my ($file) = @_;
@@ -65,6 +99,10 @@ my $done_options = 0;
     if ($done_options) {
         $_;
     }
+    elsif (/^--?help$/) {
+        USAGE;
+        exit 1;
+    }
     elsif (/^--?notify$/) {
         $notify = 1;
         ();
@@ -90,7 +128,9 @@ my $done_options = 0;
         ();
     }
     elsif (/^-/) {
-        die failure "Unrecognized option $_\n";
+        warn failure "Unrecognized option $_\n";
+        USAGE;
+        exit 1;
     }
     else {
         $_;
