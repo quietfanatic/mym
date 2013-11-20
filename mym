@@ -77,6 +77,15 @@ my $done_options = 0;
     }
 } @ARGV;
 
+if ($notify) {
+    $SIG{__DIE__} = sub {
+        my $mess = $_[0];
+        $mess =~ s/\e\[\d+m//g;
+        system 'notify-send', '-u', 'critical', 'mym error', $mess;
+        die $mess;
+    }
+}
+
  # First intuit the command.
 my $command;
 if ($0 =~ /([^\\\/]+)$/) {
@@ -99,20 +108,24 @@ else {
 given ($command) {
     when ('play') {
         -e 'control-pipe' or system qw(mkfifo control-pipe);
-        -s 'pl-select' or die failure "There are no filenames in pl-select.";
-        splat 'pl-queue', shuffle lines 'pl-select';
+        -d 'pl' or mkdir 'pl';
+        -s 'pl/select' or die failure "There are no filenames in pl/select.";
+        if (slurp('current') ne "\n") {
+             die failure "There is already a mym running.\n";
+        }
+        splat 'pl/queue', shuffle lines 'pl/select';
          # Did not find a better way to do this.
-        system('mplayer -input file=control-pipe -playlist pl-queue | ./mym parse');
+        system('mplayer -input file=control-pipe -playlist pl/queue | ./mym parse');
         splat 'current', '';
     }
     when ('up') {
         my $track = select_track;
-         # Just add to pl-up
-        if (grep $_ eq "$track\n", lines 'pl-up') {
-            warn warning "already in pl-up: $track\n";
+         # Just add to pl/up
+        if (grep $_ eq "$track\n", lines 'pl/up') {
+            warn warning "already in pl/up: $track\n";
         }
         else {
-            append 'pl-up', "$track\n";
+            append 'pl/up', "$track\n";
         }
         warn success "up: $track\n";
         if ($notify) {
@@ -121,20 +134,20 @@ given ($command) {
     }
     when ('down') {
         my $track = select_track;
-         # Add to pl-down
-        if (grep $_ eq "$track\n", lines 'pl-down') {
-            warn warning "already in pl-down: $track\n";
+         # Add to pl/down
+        if (grep $_ eq "$track\n", lines 'pl/down') {
+            warn warning "already in pl/down: $track\n";
         }
         else {
-            append 'pl-down', "$track\n";
+            append 'pl/down', "$track\n";
         }
-         # Remove from pl-select
-        my $select = slurp 'pl-select';
+         # Remove from pl/select
+        my $select = slurp 'pl/select';
         if ($select =~ s/^\Q$track\E\n//m) {
-            splat 'pl-select', $select;
+            splat 'pl/select', $select;
         }
         else {
-            warn warning "not in pl-select: $track\n";
+            warn warning "not in pl/select: $track\n";
         }
         warn success "down: $track\n";
          # And stop playing the track too
