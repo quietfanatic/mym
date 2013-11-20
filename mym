@@ -1,7 +1,9 @@
 #!/usr/bin/perl
+use FindBin;
 use autodie;
 use List::Util 'shuffle';
 use v5.14;
+chdir $FindBin::Bin;
 
 sub slurp {
     my ($file) = @_;
@@ -53,6 +55,28 @@ sub select_track {
     }
 }
 
+my $notify = 0;
+my $done_options = 0;
+@ARGV = grep {
+    if ($done_options) {
+        $_;
+    }
+    elsif (/^--?notify$/) {
+        $notify = 1;
+        ();
+    }
+    elsif (/^--$/) {
+        $done_options;
+        ();
+    }
+    elsif (/^-/) {
+        die failure "Unrecognized option $_\n";
+    }
+    else {
+        $_;
+    }
+} @ARGV;
+
  # First intuit the command.
 my $command;
 if ($0 =~ /([^\\\/]+)$/) {
@@ -91,6 +115,9 @@ given ($command) {
             append 'pl-up', "$track\n";
         }
         warn success "up: $track\n";
+        if ($notify) {
+            system 'notify-send', 'mym up', $track;
+        }
     }
     when ('down') {
         my $track = select_track;
@@ -112,17 +139,25 @@ given ($command) {
         warn success "down: $track\n";
          # And stop playing the track too
         if ($selected_current) {
+            -e 'control-pipe' or die failure "control-pipe doesn't exist.\n";
             splat 'control-pipe', "pt_step +1\n";
+        }
+        if ($notify) {
+            system 'notify-send', 'mym down', $track;
         }
     }
     when ('info') {
         my $track = select_track;
         $track =~ s/'/'\\''/g;
         my $info = `id3v2 -l '$track'`;
+        if ($notify) {
+            system 'notify-send', 'mym info', $info;
+        }
         $info =~ s/(: .*)$/\e[1m$1\e[0m/mg;
         print $info;
     }
     when ('control') {
+        -e 'control-pipe' or die failure "control-pipe doesn't exist.\n";
         splat 'control-pipe', (join ' ', @ARGV) . "\n";
     }
     when ('parse') {
@@ -140,6 +175,6 @@ given ($command) {
         }
     }
     default {
-        die failure "No command $command.  Accepted are: play up down info control parse";
+        die failure "No command $command.  Accepted are: play up down info current control parse";
     }
 }
