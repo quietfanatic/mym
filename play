@@ -1,11 +1,1 @@
-#!/bin/bash
-if [ ! -e 'control-pipe' ]; then
-    mkfifo control-pipe
-fi
-if [ ! -s 'pl-select' ]; then
-    echo 'pl-select is empty.  Please add some filenames to it.'
-    exit 1
-fi
-sort -R pl-select > pl-queue
-mplayer -input file=control-pipe -playlist pl-queue | ./set-current
-echo -n > current
+mym

@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 use autodie;
+use List::Util 'shuffle';
 use v5.14;
 
 sub slurp {
@@ -10,10 +11,17 @@ sub slurp {
     close $F;
     return $r;
 }
+sub lines {
+    my ($file) = @_;
+    open my $F, '<', $file;
+    my @r = <$F>;
+    close $F;
+    return @r;
+}
 sub splat {
-    my ($file, $str) = @_;
+    my ($file, @str) = @_;
     open my $F, '>', $file;
-    print $F $str;
+    print $F @str;
     close $F;
 }
 sub append {
@@ -65,11 +73,18 @@ else {
 }
 
 given ($command) {
+    when ('play') {
+        -e 'control-pipe' or system qw(mkfifo control-pipe);
+        -s 'pl-select' or die failure "There are no filenames in pl-select.";
+        splat 'pl-queue', shuffle lines 'pl-select';
+         # Did not find a better way to do this.
+        system('mplayer -input file=control-pipe -playlist pl-queue | ./set-current');
+        splat 'current', '';
+    }
     when ('up') {
         my $track = select_track;
-        my $up = slurp 'pl-up';
          # Just add to pl-up
-        if ($up =~ /^\Q$track\E\n/m) {
+        if (grep $_ eq "$track\n", lines 'pl-up') {
             warn warning "already in pl-up: $track\n";
         }
         else {
@@ -80,8 +95,7 @@ given ($command) {
     when ('down') {
         my $track = select_track;
          # Add to pl-down
-        my $down = slurp 'pl-down';
-        if ($down =~ /^\Q$track\E\n/m) {
+        if (grep $_ eq "$track\n", lines 'pl-down') {
             warn warning "already in pl-down: $track\n";
         }
         else {
