@@ -1,5 +1,12 @@
 mym - My own music manager.
 
-This is a super-simple music library manager wrapping mplayer.  It is very UNIXy and is designed for people who know how to use the filesystem.  I basically wanted rating behavior comparable to that of Google Play Music, but without having to deal with the cloud and the browser.
+This is a super-simple music library manager wrapping mplayer.  It is very
+UNIXy and is designed for people who know how to use the filesystem.  I
+basically wanted rating behavior comparable to that of Google Play Music, but
+without having to deal with the cloud and the browser.
 
 type ./mym -help for usage info.
+
+Since every operation of this music manager can be done with a shell command,
+it's very amenable to being controlled with global keyboard shortcuts.  I
+recommend having some shortcuts that mirror mplayer's keyboard interface.

@@ -27,6 +27,11 @@ Available commands are:
         Print id3v2 tags for the file, defaulting to current track.
     control <command>
         Send a command to mplayer through a fifo.  See mplayer's documentation.
+         Some useful commands are:
+            quit
+            pause
+            pt_step +1 : step forward in queue
+            pt_step -1 : step backward in queue
     parse
         Just interpret mplayer's output and write to ./current.  This is used
          internally by play.
