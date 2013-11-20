@@ -1,0 +1,117 @@
+#!/usr/bin/perl
+use autodie;
+use v5.14;
+
+sub slurp {
+    my ($file) = @_;
+    open my $F, '<', $file;
+    local $/;
+    my $r = <$F>;
+    close $F;
+    return $r;
+}
+sub splat {
+    my ($file, $str) = @_;
+    open my $F, '>', $file;
+    print $F $str;
+    close $F;
+}
+sub append {
+    my ($file, $str) = @_;
+    open my $F, '>>', $file;
+    print $F $str;
+    close $F;
+}
+sub success {
+    return "\e[92m✓\e[0m @_";
+}
+sub failure {
+    return "\e[91m✗\e[0m @_";
+}
+sub warning {
+    return "\e[93m?\e[0m @_";
+}
+my $selected_current = 0;
+sub select_track {
+    if (@ARGV) {
+        return shift @ARGV;
+    }
+    else {
+        $selected_current = 1;
+        my $current = slurp 'current';
+        chomp $current;
+        $current or die failure "No file currently playing\n";
+        return $current;
+    }
+}
+
+ # First intuit the command.
+my $command;
+if ($0 =~ /([^\\\/]+)$/) {
+    if ($1 eq 'mym') {
+        if (@ARGV) {
+            $command = shift @ARGV;
+        }
+        else {
+            die failure "No command given and no symlink called.\n";
+        }
+    }
+    else {
+        $command = $1;
+    }
+}
+else {
+    die failure "\$0 had a weird format: $0\n";
+}
+
+given ($command) {
+    when ('up') {
+        my $track = select_track;
+        my $up = slurp 'pl-up';
+         # Just add to pl-up
+        if ($up =~ /^\Q$track\E\n/m) {
+            warn warning "already in pl-up: $track\n";
+        }
+        else {
+            append 'pl-up', "$track\n";
+        }
+        warn success "up: $track\n";
+    }
+    when ('down') {
+        my $track = select_track;
+         # Add to pl-down
+        my $down = slurp 'pl-down';
+        if ($down =~ /^\Q$track\E\n/m) {
+            warn warning "already in pl-down: $track\n";
+        }
+        else {
+            append 'pl-down', "$track\n";
+        }
+         # Remove from pl-select
+        my $select = slurp 'pl-select';
+        if ($select =~ s/^\Q$track\E\n//m) {
+            splat 'pl-select', $select;
+        }
+        else {
+            warn warning "not in pl-select: $track\n";
+        }
+        warn success "down: $track\n";
+         # And stop playing the track too
+        if ($selected_current) {
+            splat 'control-pipe', "pt_step +1\n";
+        }
+    }
+    when ('info') {
+        my $track = select_track;
+        $track =~ s/'/'\\''/g;
+        my $info = `id3v2 -l '$track'`;
+        $info =~ s/(: .*)$/\e[1m$1\e[0m/mg;
+        print $info;
+    }
+    when ('control') {
+        splat 'control-pipe', (join ' ', @ARGV) . "\n";
+    }
+    default {
+        die failure "No command $command.  Accepted are: up down info control";
+    }
+}

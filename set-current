@@ -1,0 +1,23 @@
+#!/usr/bin/perl
+use autodie;
+$| = 1;
+
+sub splat {
+    my ($file, $str) = @_;
+    open my $F, '>', $file;
+    print $F $str;
+    close $F;
+}
+
+my $in = '';
+my $chunk = '';
+while (sysread STDIN, my $chunk, 1000) {
+    print $chunk;
+    $in .= $chunk;
+    while ($in =~ s/^((?:Playing (.*)\.|.*)[\n\r])//) {
+        if (defined $2) {
+            splat('current', "$2\n");
+        }
+    }
+}
+
