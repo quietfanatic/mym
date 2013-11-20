@@ -1,6 +1,5 @@
 #!/usr/bin/perl
 use FindBin;
-use autodie;
 use List::Util 'shuffle';
 use v5.14;
 my $old_cwd = $ENV{PWD} // die "\$ENV{PWD} was undefined\n";
@@ -41,30 +40,30 @@ END
 
 sub slurp {
     my ($file) = @_;
-    open my $F, '<', $file;
+    open my $F, '<', $file or die "Couldn't open $file for reading: $!\n";
     local $/;
     my $r = <$F>;
-    close $F;
+    close $F or die "Couldn't close $file: $!\n";
     return $r;
 }
 sub lines {
     my ($file) = @_;
-    open my $F, '<', $file;
+    open my $F, '<', $file or die "Couldn't open $file for reading: $!\n";
     my @r = <$F>;
-    close $F;
+    close $F or die "Couldn't close $file: $!\n";
     return @r;
 }
 sub splat {
     my ($file, @str) = @_;
-    open my $F, '>', $file;
+    open my $F, '>', $file or die "Couldn't open $file for writing: $!\n";
     print $F @str;
-    close $F;
+    close $F or die "Couldn't close $file: $!\n";
 }
 sub append {
     my ($file, $str) = @_;
-    open my $F, '>>', $file;
+    open my $F, '>>', $file or die "Couldn't open $file for writing: $!\n";
     print $F $str;
-    close $F;
+    close $F or die "Couldn't close $file: $!\n";
 }
 sub success {
     return "\e[92m✓\e[0m @_";
