@@ -1,9 +1,12 @@
 #!/usr/bin/perl
-use FindBin;
-use List::Util 'shuffle';
-use v5.14;
 my $old_cwd = $ENV{PWD} // die "\$ENV{PWD} was undefined\n";
-chdir $FindBin::Bin;
+if (__FILE__ =~ /^(.*)\//) {
+    chdir $1;
+}
+else {
+    require FindBin;
+    chdir $FindBin::Bin;
+}
 
 sub USAGE {
     print <<"END";
@@ -178,112 +181,111 @@ else {
     die failure "\$0 had a weird format: $0\n";
 }
 
-given ($command) {
-    when ('play') {
-        if (-s 'current') {
-             die failure "There is already a mym running.\n";
-        }
-        -e 'control-pipe' or system qw(mkfifo control-pipe);
-        -d 'pl' or mkdir 'pl';
-        my @queue = @ARGV;
-        if (!@queue) {
-            -s 'pl/default' or die failure "No arguments given and there are no filenames in pl/default.";
-            @queue = lines 'pl/default';
-        }
-        if ($downed) {
-            my %down = map $_ => 1, lines 'pl/down';
-            @queue = grep $down{$_}, @queue;
-        }
-        if ($upped) {
-            my %up = map $_ => 1, lines 'pl/up';
-            @queue = grep $up{$_}, @queue;
-        }
-        if (!$all && !$downed && !$upped) {
-            my %down = map $_ => 1, lines 'pl/down';
-            @queue = grep !$down{$_}, @queue;
-        }
-        $shuffle and @queue = shuffle @queue;
-        splat 'pl/queue', @queue;
-         # This method allows user input on the terminal.
-        system('mplayer -input file=control-pipe -playlist pl/queue | ./mym parse');
-        splat 'current', '';
+if ($command eq 'play') {
+    require List::Util;
+    if (-s 'current') {
+         die failure "There is already a mym running.\n";
     }
-    when ('up') {
-        my $track = select_track;
-         # Just add to pl/up
-        if (grep $_ eq "$track\n", lines 'pl/up') {
-            warn warning "already in pl/up: $track\n";
-        }
-        else {
-            append 'pl/up', "$track\n";
-        }
-        warn success "up: $track\n";
-        if ($notify) {
-            system 'notify-send', 'mym up', escape_html($track);
-        }
+    -e 'control-pipe' or system qw(mkfifo control-pipe);
+    -d 'pl' or mkdir 'pl';
+    my @queue = @ARGV;
+    if (!@queue) {
+        -s 'pl/default' or die failure "No arguments given and there are no filenames in pl/default.";
+        @queue = lines 'pl/default';
     }
-    when ('down') {
-        my $track = select_track;
-         # Add to pl/down
-        if (grep $_ eq "$track\n", lines 'pl/down') {
-            warn warning "already in pl/down: $track\n";
-        }
-        else {
-            append 'pl/down', "$track\n";
-        }
-        warn success "down: $track\n";
-         # And stop playing the track too
-        if ($selected_current) {
-            -e 'control-pipe' or die failure "control-pipe doesn't exist.\n";
-            splat 'control-pipe', "pt_step +1\n";
-        }
-        if ($notify) {
-            system 'notify-send', 'mym down', escape_html($track);
-        }
+    if ($downed) {
+        my %down = map $_ => 1, lines 'pl/down';
+        @queue = grep $down{$_}, @queue;
     }
-    when ('info') {
-        my $track = select_track;
-        $track =~ s/'/'\\''/g;
-        my $info = `id3v2 -R '$track'`;
-        my $num = $info =~ /^TRCK: (.*)$/m
-            ? $1 : '<unknown track number>';
-        my $title = $info =~ /^TIT2: (.*)$/m
-            ? $1 : '<unknown title>';
-        my $artist = $info =~ /^TPE1: (.*)$/m
-            ? $1 : '<unknown artist>';
-        my $album = $info =~ /^TALB: (.*)$/m
-            ? $1 : '<unknown album>';
-        my $comment = $info =~ /^COMM: (?:\(\)\[[^\]]+\]: )?(.*?)^[A-Z0-9]{4}:/ms
-            ? $1 : undef;
-        my $display = join "\n", $num, $title, $artist, $album;
-        if (defined $comment) {
-            $display .= "\n\n$comment";
-        }
-        $display .= "\n" unless $display =~ /\n$/;
-        if ($notify) {
-            system 'notify-send', 'mym info', escape_html($display);
-        }
-        print escape_html($display);
+    if ($upped) {
+        my %up = map $_ => 1, lines 'pl/up';
+        @queue = grep $up{$_}, @queue;
     }
-    when ('control') {
+    if (!$all && !$downed && !$upped) {
+        my %down = map $_ => 1, lines 'pl/down';
+        @queue = grep !$down{$_}, @queue;
+    }
+    $shuffle and @queue = List::Util::shuffle(@queue);
+    splat 'pl/queue', @queue;
+     # This method allows user input on the terminal.
+    system('mplayer -input file=control-pipe -playlist pl/queue | ./mym parse');
+    splat 'current', '';
+}
+elsif ($command eq 'up') {
+    my $track = select_track;
+     # Just add to pl/up
+    if (grep $_ eq "$track\n", lines 'pl/up') {
+        warn warning "already in pl/up: $track\n";
+    }
+    else {
+        append 'pl/up', "$track\n";
+    }
+    warn success "up: $track\n";
+    if ($notify) {
+        system 'notify-send', 'mym up', escape_html($track);
+    }
+}
+elsif ($command eq 'down') {
+    my $track = select_track;
+     # Add to pl/down
+    if (grep $_ eq "$track\n", lines 'pl/down') {
+        warn warning "already in pl/down: $track\n";
+    }
+    else {
+        append 'pl/down', "$track\n";
+    }
+    warn success "down: $track\n";
+     # And stop playing the track too
+    if ($selected_current) {
         -e 'control-pipe' or die failure "control-pipe doesn't exist.\n";
-        splat 'control-pipe', (join ' ', @ARGV) . "\n";
+        splat 'control-pipe', "pt_step +1\n";
     }
-    when ('parse') {
-        local $| = 1;
-        my $in = '';
-        my $chunk = '';
-        while (sysread STDIN, my $chunk, 1000) {
-            print $chunk;
-            $in .= $chunk;
-            while ($in =~ s/^((?:Playing (.*)\.|.*)[\n\r])//) {
-                if (defined $2) {
-                    splat 'current', "$2\n";
-                }
+    if ($notify) {
+        system 'notify-send', 'mym down', escape_html($track);
+    }
+}
+elsif ($command eq 'info') {
+    my $track = select_track;
+    $track =~ s/'/'\\''/g;
+    my $info = `id3v2 -R '$track'`;
+    my $num = $info =~ /^TRCK: (.*)$/m
+        ? $1 : '<unknown track number>';
+    my $title = $info =~ /^TIT2: (.*)$/m
+        ? $1 : '<unknown title>';
+    my $artist = $info =~ /^TPE1: (.*)$/m
+        ? $1 : '<unknown artist>';
+    my $album = $info =~ /^TALB: (.*)$/m
+        ? $1 : '<unknown album>';
+    my $comment = $info =~ /^COMM: (?:\(\)\[[^\]]+\]: )?(.*?)^[A-Z0-9]{4}:/ms
+        ? $1 : undef;
+    my $display = join "\n", $num, $title, $artist, $album;
+    if (defined $comment) {
+        $display .= "\n\n$comment";
+    }
+    $display .= "\n" unless $display =~ /\n$/;
+    if ($notify) {
+        system 'notify-send', 'mym info', escape_html($display);
+    }
+    print escape_html($display);
+}
+elsif ($command eq 'control') {
+    -e 'control-pipe' or die failure "control-pipe doesn't exist.\n";
+    splat 'control-pipe', (join ' ', @ARGV) . "\n";
+}
+elsif ($command eq 'parse') {
+    local $| = 1;
+    my $in = '';
+    my $chunk = '';
+    while (sysread STDIN, my $chunk, 1000) {
+        print $chunk;
+        $in .= $chunk;
+        while ($in =~ s/^((?:Playing (.*)\.|.*)[\n\r])//) {
+            if (defined $2) {
+                splat 'current', "$2\n";
             }
         }
     }
-    default {
-        die failure "No command $command.  Accepted are: play up down info current control parse";
-    }
+}
+else {
+    die failure "No command $command.  Accepted are: play up down info current control parse";
 }
