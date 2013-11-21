@@ -124,7 +124,7 @@ my $done_options = 0;
         ();
     }
     elsif (/^--?shuffle$/) {
-        $all = 1;
+        $shuffle = 1;
         ();
     }
     elsif (/^--$/) {
