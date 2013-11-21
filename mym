@@ -245,6 +245,8 @@ given ($command) {
         my $track = select_track;
         $track =~ s/'/'\\''/g;
         my $info = `id3v2 -R '$track'`;
+        my $num = $info =~ /^TRCK: (.*)$/m
+            ? $1 : '<unknown track number>';
         my $title = $info =~ /^TIT2: (.*)$/m
             ? $1 : '<unknown title>';
         my $artist = $info =~ /^TPE1: (.*)$/m
@@ -253,7 +255,7 @@ given ($command) {
             ? $1 : '<unknown album>';
         my $comment = $info =~ /^COMM: (?:\(\)\[[^\]]+\]: )?(.*?)^[A-Z0-9]{4}:/ms
             ? $1 : undef;
-        my $display = join "\n", $title, $artist, $album;
+        my $display = join "\n", $num, $title, $artist, $album;
         if (defined $comment) {
             $display .= "\n\n$comment";
         }
