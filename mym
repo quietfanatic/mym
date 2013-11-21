@@ -92,6 +92,15 @@ sub select_track {
         return $current;
     }
 }
+sub escape_html {
+    my ($s) = @_;
+    my %esc = (
+        '&' => 'amp',
+        '<' => 'lt',
+    );
+    $s =~ s/([&<])/&$esc{$1};/g;
+    return $s;
+}
 
 my $notify = 0;
 my $upped = 0;
@@ -145,7 +154,7 @@ if ($notify) {
     $SIG{__DIE__} = sub {
         my $mess = $_[0];
         $mess =~ s/\e\[\d+m//g;
-        system 'notify-send', '-u', 'critical', 'mym error', $mess;
+        system 'notify-send', '-u', 'critical', 'mym error', escape_html($mess);
         die $mess;
     }
 }
@@ -210,7 +219,7 @@ given ($command) {
         }
         warn success "up: $track\n";
         if ($notify) {
-            system 'notify-send', 'mym up', $track;
+            system 'notify-send', 'mym up', escape_html($track);
         }
     }
     when ('down') {
@@ -229,7 +238,7 @@ given ($command) {
             splat 'control-pipe', "pt_step +1\n";
         }
         if ($notify) {
-            system 'notify-send', 'mym down', $track;
+            system 'notify-send', 'mym down', escape_html($track);
         }
     }
     when ('info') {
@@ -250,9 +259,9 @@ given ($command) {
         }
         $display .= "\n" unless $display =~ /\n$/;
         if ($notify) {
-            system 'notify-send', 'mym info', $display;
+            system 'notify-send', 'mym info', escape_html($display);
         }
-        print $display;
+        print escape_html($display);
     }
     when ('control') {
         -e 'control-pipe' or die failure "control-pipe doesn't exist.\n";
