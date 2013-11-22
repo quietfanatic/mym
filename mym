@@ -280,8 +280,11 @@ elsif ($command eq 'parse') {
         print $chunk;
         $in .= $chunk;
         while ($in =~ s/^((?:Playing (.*)\.|.*)[\n\r])//) {
-            if (defined $2) {
-                splat 'current', "$2\n";
+            my $track = $2;
+            if (defined $track) {
+                $track =~ /([^\/]*)$/;
+                print "\e]0;mym - $1\a";
+                splat 'current', "$track\n";
             }
         }
     }
