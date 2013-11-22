@@ -266,7 +266,7 @@ elsif ($command eq 'info') {
     if ($notify) {
         system 'notify-send', 'mym info', escape_html($display);
     }
-    print escape_html($display);
+    print $display;
 }
 elsif ($command eq 'control') {
     -e 'control-pipe' or die failure "control-pipe doesn't exist.\n";
