@@ -193,18 +193,20 @@ if ($command eq 'play') {
         -s 'pl/default' or die failure "No arguments given and there are no filenames in pl/default.";
         @queue = lines 'pl/default';
     }
+    warn 'before: ', 0+@queue;
     if ($downed) {
-        my %down = map $_ => 1, lines 'pl/down';
+        my %down = map {$_ => 1} lines 'pl/down';
         @queue = grep $down{$_}, @queue;
     }
     if ($upped) {
-        my %up = map $_ => 1, lines 'pl/up';
+        my %up = map {$_ => 1} lines 'pl/up';
         @queue = grep $up{$_}, @queue;
     }
     if (!$all && !$downed && !$upped) {
-        my %down = map $_ => 1, lines 'pl/down';
+        my %down = map {$_ => 1} lines 'pl/down';
         @queue = grep !$down{$_}, @queue;
     }
+    warn 'after: ', 0+@queue;
     $shuffle and @queue = List::Util::shuffle(@queue);
     splat 'pl/queue', @queue;
      # This method allows user input on the terminal.
