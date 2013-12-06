@@ -13,7 +13,7 @@ sub USAGE {
 USAGE: $0 <options>? <command>
 Available commands are:
     play <options>? <files>?
-        Starts an mplayer instance.  If no <files> are given, reads filenames
+        Start an mplayer instance.  If no <files> are given, reads filenames
          from pl/default.  After filtering and shuffling, the queued tracks
          will be written to pl/queue.  The curretly-playing track is visible
          in ./current.  Available options are:
@@ -21,6 +21,8 @@ Available commands are:
             -upped : play only tracks that have been rated up
             -downed : play onlt tracks that have been rated down
             -shuffle : play in random order
+    resume
+        Continue a play session that was interrupted.
     up <file>?
         Rate up a file, defaulting to current track.
     down <file>?
@@ -213,6 +215,21 @@ if ($command eq 'play') {
     system('mplayer -input file=control-pipe -playlist pl/queue | ./mym parse');
     splat 'current', '';
 }
+elsif ($command eq 'resume') {
+    my $current = slurp('current') || slurp('last');
+    my @queue = lines 'pl/queue';
+    my $i = -1;
+    for (0..$#queue) {
+        $i = $_ and last if $queue[$_] eq $current;
+    }
+    $i != -1 or die failure "last not in queue: $current";
+    fork or do {
+        splat 'control-pipe', "pt_step $i\n";
+        exit;
+    };
+    system('mplayer -input file=control-pipe -playlist pl/queue | ./mym parse');
+    splat 'current', '';
+}
 elsif ($command eq 'up') {
     my $track = select_track;
      # Just add to pl/up
@@ -287,6 +304,7 @@ elsif ($command eq 'parse') {
                 $track =~ /([^\/]*)$/;
                 print "\e]0;mym - $1\a";
                 splat 'current', "$track\n";
+                splat 'last', "$track\n";
             }
         }
     }
