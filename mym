@@ -310,6 +310,7 @@ elsif ($command eq 'parse') {
                 $track =~ /([^\/]*)$/;
                 print "\e]0;mym - $1\a";
                 splat 'current', "$track\n";
+                rename 'last', 'previous';
                 splat 'last', "$track\n";
             }
         }
