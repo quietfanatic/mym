@@ -269,6 +269,12 @@ elsif ($command eq 'info') {
     my $info = `id3v2 -R '$track'`;
     my $num = $info =~ /^TRCK: (.*)$/m
         ? $1 : '<unknown track number>';
+    my $downed = grep $_ eq "$track\n", lines 'pl/down';
+    my $upped = grep $_ eq "$track\n", lines 'pl/up';
+    my $rating = $downed ? $upped ? 'ERROR: conflicting ratings'
+                         : 'rated down'
+               : $upped ? 'rated up'
+               : 'not rated';
     my $title = $info =~ /^TIT2: (.*)$/m
         ? $1 : '<unknown title>';
     my $artist = $info =~ /^TPE1: (.*)$/m
@@ -277,9 +283,9 @@ elsif ($command eq 'info') {
         ? $1 : '<unknown album>';
     my $comment = $info =~ /^COMM: (?:\(\)\[[^\]]+\]: )?(.*?)^[A-Z0-9]{4}:/ms
         ? $1 : undef;
-    my $display = join "\n", $num, $title, $artist, $album;
+    my $display = "$num ($rating)\n$title\n$artist\n$album\n";
     if (defined $comment) {
-        $display .= "\n\n$comment";
+        $display .= "\n$comment";
     }
     $display .= "\n" unless $display =~ /\n$/;
     if ($notify) {
