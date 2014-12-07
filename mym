@@ -19,7 +19,7 @@ Available commands are:
          in ./current.  Available options are:
             -all : don't ignore tracks that have been rated down
             -upped : play only tracks that have been rated up
-            -downed : play onlt tracks that have been rated down
+            -downed : play only tracks that have been rated down
             -shuffle : play in random order
             -mplayer-opts=<opts> : pass arguments to mplayer
     resume
@@ -152,8 +152,7 @@ my @mplayer_opts;
         ();
     }
     elsif (/^-/) {
-        warn failure "Unrecognized option $_\n";
-        USAGE;
+        warn failure "Unrecognized option $_; try \"$0 help\"\n";
         exit 1;
     }
     else {
@@ -178,7 +177,7 @@ if ($0 =~ /([^\\\/]+)$/) {
             $command = shift @ARGV;
         }
         else {
-            die failure "No command given and no symlink called.\n";
+            die failure "No command given and no symlink called.  Try \"$0 help\"\n";
         }
     }
     else {
@@ -322,6 +321,9 @@ elsif ($command eq 'parse') {
         }
     }
 }
+elsif ($command eq 'help') {
+    USAGE;
+}
 else {
-    die failure "No command $command.  Accepted are: play up down info current control parse";
+    die failure "No command $command.  Accepted are: play up down info control parse help\n";
 }
