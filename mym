@@ -270,8 +270,8 @@ elsif ($command eq 'down') {
 }
 elsif ($command eq 'info') {
     my $track = select_track;
-    $track =~ s/'/'\\''/g;
-    my $info = `id3v2 -R '$track'`;
+    (my $esc_track = $track) =~ s/'/'\\''/g;
+    my $info = `id3v2 -R '$esc_track'`;
     my $num = $info =~ /^TRCK: (.*)$/m
         ? $1 : '<unknown track number>';
     my $downed = grep $_ eq "$track\n", lines 'pl/down';
