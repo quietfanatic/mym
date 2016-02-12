@@ -21,6 +21,9 @@ Available commands are:
             -upped : play only tracks that have been rated up
             -downed : play only tracks that have been rated down
             -shuffle : play in random order
+            -sort=[filename|album|track] : sort by filename or album/track
+              (album and track mean the same thing.)
+            -set-default : make given files into default playlist
             -mplayer-opts=<opts> : pass arguments to mplayer
     resume
         Continue a play session that was interrupted.
@@ -62,6 +65,7 @@ sub lines {
     open my $F, '<', $file or die "Couldn't open $file for reading: $!\n";
     my @r = <$F>;
     close $F or die "Couldn't close $file: $!\n";
+    chomp for @r;
     return @r;
 }
 sub splat {
@@ -113,6 +117,8 @@ my $upped = 0;
 my $downed = 0;
 my $all = 0;
 my $shuffle = 0;
+my $sort;
+my $set_default = 0;
 my $done_options = 0;
 my @mplayer_opts;
 @ARGV = grep {
@@ -141,6 +147,14 @@ my @mplayer_opts;
     }
     elsif (/^--?shuffle$/) {
         $shuffle = 1;
+        ();
+    }
+    elsif (/^--?sort=(filename|album|track)$/) {
+        $sort = $1;
+        ();
+    }
+    elsif (/^--?set-default$/) {
+        $set_default = 1;
         ();
     }
     elsif (/^--?mplayer-opts=(.*)$/) {
@@ -189,7 +203,6 @@ else {
 }
 
 if ($command eq 'play') {
-    require List::Util;
     if (-s 'current') {
          die failure "There is already a mym running.\n";
     }
@@ -199,6 +212,11 @@ if ($command eq 'play') {
     if (!@queue) {
         -s 'pl/default' or die failure "No arguments given and there are no filenames in pl/default.";
         @queue = lines 'pl/default';
+    }
+    for (@queue) {
+        unless (/^\//) {
+            $_ = "$old_cwd/$_";
+        };
     }
     warn 'before: ', 0+@queue;
     if ($downed) {
@@ -214,31 +232,59 @@ if ($command eq 'play') {
         @queue = grep !$down{$_}, @queue;
     }
     warn 'after: ', 0+@queue;
-    $shuffle and @queue = List::Util::shuffle(@queue);
-    splat 'pl/queue', @queue;
+    if ($sort eq 'filename') {
+        @queue = sort @queue;
+    }
+    elsif ($sort eq 'album' or $sort eq 'track') {
+        my %track;
+        my %album;
+        my $i = 0;
+        for (@queue) {
+            print "sorting...$i\r";
+            $i += 1;
+            (my $esc_track = $_) =~ s/'/'\\''/g;
+            my $info = `id3v2 -R '$esc_track'`;
+            $track{$_} = $info =~ /^TRCK: (.*)$/m
+                ? 0+$1 : -1;
+            $album{$_} = $info =~ /^TALB: (.*)$/m
+                ? $1 : '!<unknown album>';
+        }
+        @queue = sort { $album{$a} cmp $album{$b} || $track{$a} <=> $track{$b} } @queue;
+    }
+    if ($set_default) {
+        splat 'pl/default', join("\n", @queue) . "\n";
+    }
+    if ($shuffle) {
+        require List::Util;
+        @queue = List::Util::shuffle(@queue);
+    }
+    splat 'pl/queue', join("\n", @queue) . "\n";
      # This method allows user input on the terminal.
     system("mplayer @mplayer_opts -input file=control-pipe -playlist pl/queue | ./mym parse");
     splat 'current', '';
 }
 elsif ($command eq 'resume') {
     my $current = slurp('current') || slurp('last');
+    chomp $current;
     my @queue = lines 'pl/queue';
     my $i = -1;
     for (0..$#queue) {
         $i = $_ and last if $queue[$_] eq $current;
     }
-    $i != -1 or die failure "last not in queue: $current";
-    fork or do {
-        splat 'control-pipe', "pt_step $i\n";
-        exit;
-    };
+    $i != -1 or die failure "last not in queue: $current\n";
+    if ($i > 0) {
+        fork or do {
+            splat 'control-pipe', "pt_step $i\n";
+            exit;
+        };
+    }
     system("mplayer @mplayer_opts -input file=control-pipe -playlist pl/queue | ./mym parse");
     splat 'current', '';
 }
 elsif ($command eq 'up') {
     my $track = select_track;
      # Just add to pl/up
-    if (grep $_ eq "$track\n", lines 'pl/up') {
+    if (grep $_ eq "$track", lines 'pl/up') {
         warn warning "already in pl/up: $track\n";
     }
     else {
@@ -252,7 +298,7 @@ elsif ($command eq 'up') {
 elsif ($command eq 'down') {
     my $track = select_track;
      # Add to pl/down
-    if (grep $_ eq "$track\n", lines 'pl/down') {
+    if (grep $_ eq "$track", lines 'pl/down') {
         warn warning "already in pl/down: $track\n";
     }
     else {
@@ -274,8 +320,8 @@ elsif ($command eq 'info') {
     my $info = `id3v2 -R '$esc_track'`;
     my $num = $info =~ /^TRCK: (.*)$/m
         ? $1 : '<unknown track number>';
-    my $downed = grep $_ eq "$track\n", lines 'pl/down';
-    my $upped = grep $_ eq "$track\n", lines 'pl/up';
+    my $downed = grep $_ eq "$track", lines 'pl/down';
+    my $upped = grep $_ eq "$track", lines 'pl/up';
     my $rating = $downed ? $upped ? 'ERROR: conflicting ratings'
                          : 'rated down'
                : $upped ? 'rated up'
