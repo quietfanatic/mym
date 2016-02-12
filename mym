@@ -260,7 +260,8 @@ if ($command eq 'play') {
     }
     splat 'pl/queue', join("\n", @queue) . "\n";
      # This method allows user input on the terminal.
-    system("mplayer @mplayer_opts -input file=control-pipe -playlist pl/queue | ./mym parse");
+    my $parse = "./mym parse" . ($notify ? " -notify" : "");
+    system("mplayer @mplayer_opts -input file=control-pipe -playlist pl/queue | $parse");
     splat 'current', '';
 }
 elsif ($command eq 'resume') {
@@ -278,7 +279,8 @@ elsif ($command eq 'resume') {
             exit;
         };
     }
-    system("mplayer @mplayer_opts -input file=control-pipe -playlist pl/queue | ./mym parse");
+    my $parse = "./mym parse" . ($notify ? " -notify" : "");
+    system("mplayer @mplayer_opts -input file=control-pipe -playlist pl/queue | $parse");
     splat 'current', '';
 }
 elsif ($command eq 'up') {
@@ -333,16 +335,16 @@ elsif ($command eq 'info') {
     my $album = $info =~ /^TALB: (.*)$/m
         ? $1 : '<unknown album>';
     my $comment = $info =~ /^COMM: (?:\(\)\[[^\]]+\]: )?(.*?)^[A-Z0-9]{4}:/ms
-        ? $1 : undef;
-    my $display = "$num ($rating)\n$title\n$artist\n$album\n";
-    if (defined $comment) {
-        $display .= "\n$comment";
-    }
-    $display .= "\n" unless $display =~ /\n$/;
+        ? $1 : "";
+    chomp $comment;
+    my $header = "$num ($rating)\n$title\n$artist\n$album\n";
     if ($notify) {
-        system 'notify-send', 'mym info', escape_html($display);
+        system 'notify-send', 'mym info',
+            escape_html($header) . "\n<small>" . escape_html($comment) . '</small>';
     }
-    print $display;
+    $header =~ tr/\e\a//d;
+    $comment =~ tr/\e\a//d;
+    print "$header\n$comment\n";
 }
 elsif ($command eq 'control') {
     -e 'control-pipe' or die failure "control-pipe doesn't exist.\n";
@@ -363,6 +365,9 @@ elsif ($command eq 'parse') {
                 splat 'current', "$track\n";
                 rename 'last', 'previous';
                 splat 'last', "$track\n";
+                if ($notify) {
+                    system("./mym info -notify > /dev/null");
+                }
             }
         }
     }
