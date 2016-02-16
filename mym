@@ -30,8 +30,7 @@ Available commands are:
     up <file>?
         Rate up a file, defaulting to current track.
     down <file>?
-        Rate down a file, defaulting to current track, and causing the
-         currently playing player to step forward if so.
+        Rate down a file, defaulting to current track.
     info <file>?
         Print id3v2 tags for the file, defaulting to current track.
             -short : Don't print the comment tag.
@@ -315,11 +314,6 @@ elsif ($command eq 'down') {
         append 'pl/down', "$track\n";
     }
     warn success "down: $track\n";
-     # And stop playing the track too
-    if ($selected_current) {
-        -e 'control-pipe' or die failure "control-pipe doesn't exist.\n";
-        splat 'control-pipe', "pt_step +1\n";
-    }
     if ($notify) {
         system 'notify-send', 'mym down', escape_html($track);
     }
