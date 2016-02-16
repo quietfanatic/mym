@@ -34,6 +34,7 @@ Available commands are:
          currently playing player to step forward if so.
     info <file>?
         Print id3v2 tags for the file, defaulting to current track.
+            -short : Don't print the comment tag.
     control <command>
         Send a command to mplayer through a fifo.  See mplayer's documentation.
          Some useful commands are:
@@ -46,8 +47,8 @@ Available commands are:
          internally by play.
 Universal options are:
     -notify : Any relevant information and error messages are sent to
-               notify-send as well as being printed.  Does not notify
-               when the current track has changed.
+               notify-send as well as being printed.  On play and resume,
+               notifies when the track has changed.
 
 END
 }
@@ -119,55 +120,62 @@ my $all = 0;
 my $shuffle = 0;
 my $sort;
 my $set_default = 0;
+my $short = 0;
 my $done_options = 0;
 my @mplayer_opts;
 @ARGV = grep {
     if ($done_options) {
         $_;
     }
-    elsif (/^--?help$/) {
-        USAGE;
-        exit 1;
-    }
-    elsif (/^--?notify$/) {
-        $notify = 1;
-        ();
-    }
-    elsif (/^--?upped$/) {
-        $upped = 1;
-        ();
-    }
-    elsif (/^--?downed$/) {
-        $downed = 1;
-        ();
-    }
-    elsif (/^--?all$/) {
-        $all = 1;
-        ();
-    }
-    elsif (/^--?shuffle$/) {
-        $shuffle = 1;
-        ();
-    }
-    elsif (/^--?sort=(filename|album|track)$/) {
-        $sort = $1;
-        ();
-    }
-    elsif (/^--?set-default$/) {
-        $set_default = 1;
-        ();
-    }
-    elsif (/^--?mplayer-opts=(.*)$/) {
-        @mplayer_opts = map quotemeta($_), split /\s+/, $1;
-        ();
-    }
-    elsif (/^--$/) {
-        $done_options;
-        ();
-    }
-    elsif (/^-/) {
-        warn failure "Unrecognized option $_; try \"$0 help\"\n";
-        exit 1;
+    if (/^-/) {
+        if (/^--?help$/) {
+            USAGE;
+            exit 1;
+        }
+        elsif (/^--?notify$/) {
+            $notify = 1;
+            ();
+        }
+        elsif (/^--?upped$/) {
+            $upped = 1;
+            ();
+        }
+        elsif (/^--?downed$/) {
+            $downed = 1;
+            ();
+        }
+        elsif (/^--?all$/) {
+            $all = 1;
+            ();
+        }
+        elsif (/^--?shuffle$/) {
+            $shuffle = 1;
+            ();
+        }
+        elsif (/^--?sort=(filename|album|track)$/) {
+            $sort = $1;
+            ();
+        }
+        elsif (/^--?set-default$/) {
+            $set_default = 1;
+            ();
+        }
+        elsif (/^--?short$/) {
+            $short = 1;
+            ();
+        }
+        elsif (/^--?mplayer-opts=(.*)$/) {
+            @mplayer_opts = map quotemeta($_), split /\s+/, $1;
+            ();
+        }
+        elsif (/^--$/) {
+            $done_options;
+            ();
+        }
+        else {
+            warn failure "Unrecognized option $_; try \"$0 help\"\n";
+            exit 1;
+        }
     }
     else {
         $_;
@@ -339,12 +347,14 @@ elsif ($command eq 'info') {
     chomp $comment;
     my $header = "$num ($rating)\n$title\n$artist\n$album\n";
     if ($notify) {
-        system 'notify-send', 'mym info',
-            escape_html($header) . "\n<small>" . escape_html($comment) . '</small>';
+        my $s = escape_html($header);
+        $s .= "\n<small>" . escape_html($comment) . "</small>" unless $short;
+        system 'notify-send', 'mym is now playing', $s;
     }
     $header =~ tr/\e\a//d;
     $comment =~ tr/\e\a//d;
-    print "$header\n$comment\n";
+    print "$header\n";
+    print "$comment\n" unless $short;
 }
 elsif ($command eq 'control') {
     -e 'control-pipe' or die failure "control-pipe doesn't exist.\n";
@@ -366,7 +376,7 @@ elsif ($command eq 'parse') {
                 rename 'last', 'previous';
                 splat 'last', "$track\n";
                 if ($notify) {
-                    system("./mym info -notify > /dev/null");
+                    system("./mym info -notify -short > /dev/null");
                 }
             }
         }
