@@ -96,10 +96,12 @@ sub select_track {
     }
     else {
         $selected_current = 1;
-        my $current = slurp 'current';
-        chomp $current;
-        $current or die failure "No file currently playing\n";
-        return $current;
+        for ('current', 'last') {
+            my $current = slurp $_;
+            chomp $current;
+            return $current if $current;
+        }
+        die failure "No file currently playing.\n";
     }
 }
 sub escape_html {
